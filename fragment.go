@@ -7,18 +7,19 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/sashabaranov/go-openai"
 	"github.com/teslashibe/cogito/pkg/xlog"
 	"github.com/teslashibe/cogito/structures"
-	"github.com/sashabaranov/go-openai"
 )
 
 type Status struct {
-	Iterations   int
-	ToolsCalled  Tools
-	ToolResults  []ToolStatus
-	Plans        []PlanStatus
-	PastActions  []ToolStatus // Track past actions for loop detections
-	ReasoningLog []string     // Track reasoning for each iteration
+	Iterations         int
+	ToolsCalled        Tools
+	ToolResults        []ToolStatus
+	Plans              []PlanStatus
+	PastActions        []ToolStatus  // Track past actions for loop detections
+	ReasoningLog       []string      // Track reasoning for each iteration
+	PendingToolChoices []*ToolChoice // Pending parallel tool calls to process
 }
 
 type Fragment struct {
@@ -129,6 +130,12 @@ func (r Fragment) AddMessage(role, content string, mm ...Multimedia) Fragment {
 
 // AddToolMessage adds a tool result message with the specified tool_call_id
 func (r Fragment) AddToolMessage(content, toolCallID string) Fragment {
+	// Ensure content is not empty - some LLM providers (including OpenRouter)
+	// return 500 errors when tool results have empty content
+	if content == "" {
+		content = "(no output)"
+	}
+
 	chatCompletionMessage := openai.ChatCompletionMessage{
 		Role:       "tool",
 		Content:    content,
@@ -190,7 +197,13 @@ func (r Fragment) ExtractStructure(ctx context.Context, llm LLM, s structures.St
 		return fmt.Errorf("no tool calls: %d", len(msg.ToolCalls))
 	}
 
-	return json.Unmarshal([]byte(msg.ToolCalls[0].Function.Arguments), s.Object)
+	// Normalize empty string to empty JSON object (some providers return "" instead of "{}")
+	args := msg.ToolCalls[0].Function.Arguments
+	if args == "" {
+		args = "{}"
+	}
+
+	return json.Unmarshal([]byte(args), s.Object)
 }
 
 type ToolChoice struct {
@@ -253,7 +266,13 @@ func (f Fragment) SelectTool(ctx context.Context, llm LLM, availableTools Tools,
 	toolCall := resp.Choices[0].Message.ToolCalls[0]
 	arguments := make(map[string]any)
 
-	if err := json.Unmarshal([]byte(toolCall.Function.Arguments), &arguments); err != nil {
+	// Normalize empty string to empty JSON object (some providers return "" instead of "{}")
+	args := toolCall.Function.Arguments
+	if args == "" {
+		args = "{}"
+	}
+
+	if err := json.Unmarshal([]byte(args), &arguments); err != nil {
 		return Fragment{}, nil, fmt.Errorf("failed to parse tool call arguments: %w", err)
 	}
 
