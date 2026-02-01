@@ -2,11 +2,12 @@ package cogito
 
 import (
 	"context"
+	"time"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
+	"github.com/sashabaranov/go-openai"
 	"github.com/teslashibe/cogito/pkg/xlog"
 	"github.com/teslashibe/cogito/prompt"
-	"github.com/sashabaranov/go-openai"
 )
 
 // Options contains all configuration options for the Cogito agent
@@ -37,6 +38,8 @@ type Options struct {
 	maxRetries                        int
 	loopDetectionSteps                int
 	forceReasoning                    bool
+	forgeProvider                     func() []ToolDefinitionInterface
+	toolFeedbackHandler               func(toolName string, success bool, latency time.Duration, err error)
 
 	startWithAction *ToolChoice
 
@@ -153,6 +156,20 @@ func WithPrompt(t prompt.PromptType, p prompt.StaticPrompt) func(o *Options) {
 func WithTools(tools ...ToolDefinitionInterface) func(o *Options) {
 	return func(o *Options) {
 		o.tools = append(o.tools, tools...)
+	}
+}
+
+// WithForgeProvider sets a dynamic tool provider for hot-loaded tools.
+func WithForgeProvider(provider func() []ToolDefinitionInterface) func(o *Options) {
+	return func(o *Options) {
+		o.forgeProvider = provider
+	}
+}
+
+// WithToolFeedback sets a callback for tool execution results.
+func WithToolFeedback(handler func(toolName string, success bool, latency time.Duration, err error)) func(o *Options) {
+	return func(o *Options) {
+		o.toolFeedbackHandler = handler
 	}
 }
 

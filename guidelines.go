@@ -106,6 +106,9 @@ func usableTools(llm LLM, fragment Fragment, opts ...Option) (Tools, Guidelines,
 	o.Apply(opts...)
 
 	tools := slices.Clone(o.tools)
+	if o.forgeProvider != nil {
+		tools = append(tools, o.forgeProvider()...)
+	}
 
 	guidelines := o.guidelines
 	prompts := []openai.ChatCompletionMessage{}

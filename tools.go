@@ -1671,6 +1671,7 @@ Please provide a revised tool call based on this feedback.`,
 		}
 
 		// Execute tool
+		startTime := time.Now()
 		attempts := 1
 		var result string
 	RETRY:
@@ -1689,6 +1690,9 @@ Please provide a revised tool call based on this feedback.`,
 			} else {
 				break RETRY
 			}
+		}
+		if o.toolFeedbackHandler != nil {
+			o.toolFeedbackHandler(selectedToolResult.Name, err == nil, time.Since(startTime), err)
 		}
 
 		o.statusCallback(result)
