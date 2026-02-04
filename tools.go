@@ -1705,7 +1705,7 @@ Please provide a revised tool call based on this feedback.`,
 
 		// Add tool result to fragment with the tool_call_id
 		f = f.AddToolMessage(result, selectedToolResult.ID)
-		xlog.Debug("Tool result", "result", result)
+		xlog.Debug("Tool result", "result", formatToolResultForLog(result))
 
 		f.Status.Iterations = f.Status.Iterations + 1
 		f.Status.ToolsCalled = append(f.Status.ToolsCalled, toolResult)
@@ -1757,4 +1757,16 @@ Please provide a revised tool call based on this feedback.`,
 	}
 
 	return f, nil
+}
+
+const maxToolResultLogChars = 500
+
+func formatToolResultForLog(result string) string {
+	trimmed := strings.TrimSpace(result)
+	trimmed = strings.ReplaceAll(trimmed, "\n", " ")
+	trimmed = strings.ReplaceAll(trimmed, "\t", " ")
+	if len(trimmed) > maxToolResultLogChars {
+		return fmt.Sprintf("%s… (truncated, %d chars)", trimmed[:maxToolResultLogChars], len(trimmed))
+	}
+	return trimmed
 }
